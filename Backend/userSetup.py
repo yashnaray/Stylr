@@ -24,13 +24,20 @@ class User:
     username: str
     password: str
     role: UserRole
+    pref_counter: dict
     def __init__(self, username: str, password: str, role: UserRole):
         self.username = username
         self.password = password
         self.role = role
 
-    def set_pref(self,gender,subcategory,articleType,season,usage):
-        pass
+    def set_init_pref(self,**kwargs) -> None:
+        assert kwargs is not None && len(kwargs) > 2 # Check if the user actually entered some data
+        pref = {i:1 for i in kwargs} # We don't know the rankings yet
+
+    def get_recs(self) -> list[Any]:
+        from random import choice
+        ch1 = None #Will add later
+        return []
 
 class budgetMacro:
     def __init__(self):
