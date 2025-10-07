@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 320px;
+  min-height: 100vh;
+  @apply bg-gray-200;
+}
