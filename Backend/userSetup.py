@@ -39,6 +39,11 @@ class User:
     def set_init_pref(self,**kwargs) -> None: # kwargs are of type userEnums
         assert kwargs is not None and len(kwargs) > 2
         self.pref_counter = Counter({k: kwargs[k].value for k in kwargs})
+    
+    def update_preference(self, **kwargs) -> None: # kwargs are of type userEnums
+        if not hasattr(self, 'pref_counter'):
+            self.pref_counter = Counter()
+        self.pref_counter.update({k: kwargs[k].value for k in kwargs})
 
     def get_recs(self) -> list[Any]:
         from random import random, sample
