@@ -71,7 +71,7 @@ class User:
             self.pref_counter = Counter()
         self.pref_counter.update({k: kwargs[k].value for k in kwargs})
 
-    def get_recs(self) -> list[Any]:
+    def get_recs(self, num_recs = 5) -> list[Any]:
         from random import sample
         if not hasattr(self, 'pref_counter') or not self.pref_counter: return []
         
@@ -95,8 +95,8 @@ class User:
         
         if not indices: return []
         
-        n_samples = min(5, count)
-        if count <= 5:
+        n_samples = min(num_recs, count)
+        if count <= num_recs:
             sample_indices = indices
         else:
             sample_indices = np.random.choice(indices, n_samples, replace=False)
@@ -115,7 +115,7 @@ def main():
     u = User("test", "test", UserRole.USER)
     u.set_init_pref(gender = userEnums.Gender.MALE, baseColour= userEnums.Basecolour.BLACK, season=userEnums.Season.SUMMER)
     
-    recs = u.get_recs()
+    recs = u.get_recs(7)
     if recs:
         print(f"Found {len(recs)} recommendations:")
         for i, rec in enumerate(recs):
