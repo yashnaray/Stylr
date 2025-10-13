@@ -40,15 +40,12 @@ class User:
                 if col in df.columns:
                     df[col] = df[col].astype('category')
             User._dataset = df
-            # Pre-compute sample pool for faster random access
             User._sample_pool = np.arange(len(df))
     
     @staticmethod
     @lru_cache(maxsize=256)
     def _get_filtered_data(prefs_tuple):
         df = User._dataset
-        
-        # Build query string for faster filtering
         conditions = []
         for key, value in prefs_tuple:
             if key == 'gender':
@@ -98,7 +95,6 @@ class User:
         
         if not indices: return []
         
-        # Use numpy for faster sampling
         n_samples = min(5, count)
         if count <= 5:
             sample_indices = indices
