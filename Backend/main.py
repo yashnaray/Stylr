@@ -12,6 +12,7 @@ import socket
 import sys
 import time
 import urllib.parse
+from db import init_db, create_user, verify_user
 
 secret_key = b"12345"
 
@@ -39,25 +40,20 @@ def swt_decode(token):
     except:
         return None
 
-def hash_password(password, salt):
-    h = hashlib.sha512()
-    h.update(password.encode("utf-8") + salt)
-    return h.hexdigest()
-
-my_uid = 1000
-my_username = "daniel"
-my_salt = os.urandom(16)
-my_passhash = hash_password("li", my_salt)
-
 def verify_login(username, password):
-    if username != my_username or hash_password(password, my_salt) != my_passhash:
+    uid = verify_user(username, password)
+    if uid is None:
         raise Response(401, "Invalid credentials")
-    return swt_encode(1000)
+    return swt_encode(uid)
 
 #---------------------------------------
 
 def GET_ok(req):
-    return Response(200, "Welcome to Stylr!")
+    try:
+        uid = req.auth()
+        return Response(200, "Welcome to Stylr!")
+    except Response:
+        return Response(401, "Unauthorized")
 
 def GET_uid(req):
     uid = req.auth()
@@ -76,7 +72,20 @@ def POST_login(req):
     return Response(200, {"access_token": token})
 
 def POST_register(req):
-    pass
+    data = req.json()
+    try:
+        username = data["username"]
+        assert isinstance(username, str)
+        password = data["password"]
+        assert isinstance(password, str)
+    except:
+        return Response(400, "Invalid request")
+    try:
+        user_id = create_user(username, password)
+        token = swt_encode(user_id)
+        return Response(200, {"access_token": token})
+    except:
+        return Response(409, "Username already exists")
 
 #---------------------------------------
 
@@ -147,6 +156,7 @@ class Request(http.server.BaseHTTPRequestHandler):
             raise Response(400, "Invalid request body")
 
 def main():
+    init_db()
     address = ("", 3031)
 
     # https://docs.python.org/3/library/signal.html#note-on-signal-handlers-and-exceptions
