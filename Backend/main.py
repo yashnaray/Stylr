@@ -89,6 +89,11 @@ class Request(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         self.do("POST")
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_cors_headers()
+        self.end_headers()
+
     def do(self, method):
         try:
             response = self.do_unprotected(method)
@@ -98,6 +103,7 @@ class Request(http.server.BaseHTTPRequestHandler):
             response = Response(503, "Service Unavailable")
         self.send_response(response.status)
         self.send_header("content-type", "application/json")
+        self.send_cors_headers()
         self.end_headers()
         if response.body is not None:
             self.wfile.write(json.dumps(response.body).encode("utf-8"))
@@ -118,6 +124,11 @@ class Request(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         pass
+
+    def send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
     def auth(self):
         if "access_token" not in self.params:
