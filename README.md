@@ -8,8 +8,7 @@ Stylr is a class project application that suggests clothing items to users
 based on user-specified preferences. It is a simple web application based on
 [React](https://react.dev) and
 [React Router](https://reactrouter.com),
-with a backend implemented in Python using
-[Uvicorn](https://uvicorn.dev).
+with a backend implemented in Python.
 
 ## Getting Started
 
@@ -36,14 +35,14 @@ This can be changed by setting the environment variable `STYLR_API_URL`.
 You will need:
 
 - A recent enough [Python](https://www.python.org)
-- [Uvicorn](https://uvicorn.dev)
 
 Change to the `Backend` directory, then:
 
 ```
-uvicorn --port 3031 api:api
+./main.py
 ```
 
+This will bind to port 3031 by default.
 All routes are available at both the top level and `/api`.
 
 ## Rationale
