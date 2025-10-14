@@ -6,6 +6,7 @@ import App from './App.tsx';
 import Login from './Login.tsx';
 import Register from './Register.tsx';
 import './main.css';
+import Swipe from './pages/Swipe.tsx';
 
 function Root() {
   const location = useLocation();
@@ -38,6 +39,7 @@ createRoot(root).render(
         <Route path="/" Component={Root} />
         <Route path="/login" Component={Login} />
         <Route path="/register" Component={Register} />
+        <Route path="/swipe" Component={Swipe} />       
         <Route path="*" Component={NotFound} />
       </Routes>
     </BrowserRouter>
