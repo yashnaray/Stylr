@@ -12,8 +12,6 @@ export type ItemPayload = {
   name?: string;
 };
 
-// these endpoints assume our backend exposes
-
 export async function getRecs(accessToken: string, limit = 30) {
   const url = `/api/recommendations?limit=${limit}&access_token=${encodeURIComponent(accessToken)}`;
   const res = await fetch(url);
