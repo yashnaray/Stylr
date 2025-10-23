@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { UserContext } from './user.tsx';
 
 function InputField(props: React.JSX.IntrinsicElements['input']) {
@@ -8,14 +8,13 @@ function InputField(props: React.JSX.IntrinsicElements['input']) {
 
 export default function Login() {
   const { setToken } = useContext(UserContext);
+  const location = useLocation();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function doSubmit(data: unknown) {
-    //await new Promise(resolve => setTimeout(resolve, 500));
-    const response = await fetch('/api/login', {
+    const response = await fetch("/api/login", {
       method: 'POST',
       headers: {
         'content-type': 'application/json'
@@ -23,14 +22,19 @@ export default function Login() {
       body: JSON.stringify(data)
     });
     if (response.status === 401) {
-      return void setMessage('Invalid credentials');
+      const { message } = await response.json();
+      return void setMessage(message);
     }
     if (response.status !== 200) {
       return void setMessage(`Error: ${response.status} ${response.statusText}`);
     }
     const { access_token } = await response.json();
     setToken(access_token);
-    navigate(params.get('to') || '/');
+    if (location.state) {
+      navigate(location.state.referer);
+    } else {
+      navigate("/");
+    }
   }
 
   async function submit(ev: React.FormEvent<HTMLFormElement>): Promise<void> {

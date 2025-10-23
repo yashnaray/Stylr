@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://cise.ufl.edu/~li.daniel/api/stylr/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

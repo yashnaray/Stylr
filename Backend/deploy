@@ -1,0 +1,16 @@
+#!/bin/sh
+
+files='
+main.py
+database.py
+'
+
+script='
+set -e
+d=stylr-backend
+rm -rf $d
+mkdir $d
+tar -xzvC $d
+'
+
+tar -cz $files | ssh -q li.daniel@storm.cise.ufl.edu "$script"

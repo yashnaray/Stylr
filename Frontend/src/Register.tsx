@@ -26,7 +26,7 @@ export default function Register() {
     }
     setPending(true);
     try {
-      const response = await fetch('/api/register', {
+      const response = await fetch("/api/register", {
         method: 'POST',
         headers: {
           'content-type': 'application/json'

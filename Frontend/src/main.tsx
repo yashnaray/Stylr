@@ -1,19 +1,21 @@
-import { useContext } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Link, Routes, Route, useLocation, useNavigate } from 'react-router';
-import { UserContext, UserProvider } from './user.tsx';
-import App from './App.tsx';
-import Login from './Login.tsx';
-import Register from './Register.tsx';
-import './main.css';
+import { useContext } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Link, Routes, Route, useLocation, useNavigate } from "react-router";
+import { UserContext, UserProvider } from "./user.tsx";
+import App from "./App.tsx";
+import Login from "./Login.tsx";
+import Register from "./Register.tsx";
+import "./main.css";
 
 function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const { token } = useContext(UserContext);
   if (!token) {
-    const url = `/login?to=${encodeURIComponent(location.pathname + location.search + location.hash)}`;
-    queueMicrotask(() => navigate(url, { replace: true }));
+    queueMicrotask(() => navigate("/login", {
+      replace: true,
+      state: { referer: location.pathname + location.search + location.hash }
+    }));
     return null;
   }
   return <App />;
@@ -29,7 +31,7 @@ function NotFound() {
   );
 }
 
-const root = document.getElementById('root')!;
+const root = document.getElementById("root")!;
 
 createRoot(root).render(
   <UserProvider>
