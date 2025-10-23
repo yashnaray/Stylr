@@ -6,8 +6,8 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from Backend.db import User
-from model_interactions import Item, Interaction
+from db import User
+from Analytics.model_interactions import Item, Interaction
 
 def parse_price_to_float(value: Any) -> Optional[float]:
     if value is None:
