@@ -3,7 +3,7 @@ import json
 import os
 import psycopg2
 
-DATABASE_URL = os.getenv("STYLR_DATABASE_URL", "postgresql://stylr:stylr@localhost/stylr")
+DATABASE_URL = os.getenv("STYLR_DATABASE_URL", "dbname=postgres user=postgres port=3031")
 
 def hash_password(password, salt):
     h = hashlib.sha512()

@@ -1,34 +1,12 @@
-import { execFile, execFileSync, spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { execFile, execFileSync } from "node:child_process";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
-const databaseDirectory = "../Backend/postgres";
-
-function initDatabase() {
-  try {
-    mkdirSync(databaseDirectory);
-  } catch (e) {
-    if (e.code === "EEXIST") {
-      return; // database directory exists, we are done
-    }
-    throw e;
-  }
-  const args = ["-A", "trust", "-U", "stylr", "-D", databaseDirectory];
-  execFileSync("initdb", args, { stdio: "inherit" });
-}
-
 /** @type {import("vite").ServerHook} */
 function configureServer(server) {
-  initDatabase();
-  const postgres = spawn("postgres", ["-p", "3101", "-D", databaseDirectory], {
-    stdio: ["ignore", "inherit", "inherit"]
-  });
-  server.httpServer.on("close", () => {
-    postgres.kill("SIGINT");
-  });
-  process.on("SIGINT", () => {
-    server.close();
+  execFileSync("python3", ["startdb.py"], {
+    cwd: "../Backend",
+    stdio: "inherit"
   });
   server.middlewares.use("/api", (req, res) => {
     const options = {
