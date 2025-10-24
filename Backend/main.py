@@ -126,6 +126,11 @@ def POST(req):
     token = swt_encode(uid)
     return Response(200, {"access_token": token})
 
+@api("/match")
+def GET(req):
+    import match
+    return Response(200, match.match())
+
 #---------------------------------------
 
 def main():
