@@ -7,10 +7,9 @@ database.py
 
 script='
 set -e
-d=stylr-backend
-rm -rf $d
-mkdir $d
-tar -xzvC $d
+cd stylr-backend
+rm -f *.py
+tar -xzv
 '
 
 tar -cz $files | ssh -q li.daniel@storm.cise.ufl.edu "$script"
