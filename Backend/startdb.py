@@ -13,7 +13,7 @@ CREATE SCHEMA public;
 
 init_sql = """
 CREATE TABLE IF NOT EXISTS users (
-    uid int PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    uid serial PRIMARY KEY,
     username text UNIQUE NOT NULL,
     password text NOT NULL,
     salt text NOT NULL
