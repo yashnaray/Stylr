@@ -37,10 +37,11 @@ def swt_decode(token):
         else None)
 
 class Request:
-    def __init__(self, method, path, params):
+    def __init__(self, method, path, params, body):
         self.method = method
         self.path = path
         self.params = params
+        self.body = body
 
     def auth(self):
         if "access_token" not in self.params:
@@ -52,7 +53,7 @@ class Request:
         return uid
 
     def json(self):
-        data = sys.stdin.read()
+        data = sys.stdin.read() if self.body is None else self.body
         try:
             return json.loads(data)
         except:
@@ -239,13 +240,9 @@ def POST(req):
 
 #---------------------------------------
 
-def api(method, path, query=None):
-    params = {}
-    if query:
-        for item in query.split("&"):
-            key, _, value = item.partition("=")
-            if key:
-                params[key] = value
+def api(method, path, params=None, body=None):
+    if params is None:
+        params = {}
     if path.startswith("/api/"):
         path = path[4:]
     methods = endpoints.get(path)
@@ -255,7 +252,7 @@ def api(method, path, query=None):
     if handler is None:
         return Response(405)
     try:
-        return handler(Request(method, path, params))
+        return handler(Request(method, path, params, body))
     except Response as response:
         return response
 
@@ -263,17 +260,26 @@ def main():
     direct = "REQUEST_METHOD" not in os.environ
 
     if direct:
-        if len(sys.argv) != 3:
-            sys.stderr.write(f"usage: {sys.argv[0]} METHOD URL\n")
+        if len(sys.argv) < 3 or len(sys.argv) > 4:
+            sys.stderr.write(f"usage: {sys.argv[0]} METHOD URL [BODY]\n")
             sys.exit(2)
-        method, url = sys.argv[1:]
-        path, _, query = url.partition("?")
+        method = sys.argv[1]
+        path, _, query = sys.argv[2].partition("?")
+        body = sys.argv[3] if len(sys.argv) > 3 else None
     else:
         method = os.environ["REQUEST_METHOD"]
         path = os.environ.get("PATH_INFO", "")
         query = os.environ.get("QUERY_STRING", "")
+        body = None
 
-    response = api(method, path, query)
+    params = {}
+    if query:
+        for item in query.split("&"):
+            key, _, value = item.partition("=")
+            if key:
+                params[key] = value
+
+    response = api(method, path, params, body)
     prefix = "HTTP/1.1" if direct else "status:"
     phrase = http_status_map[response.status]
     body = response.body
