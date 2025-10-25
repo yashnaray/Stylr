@@ -17,15 +17,30 @@ http_status_map = {
     500: "Internal Server Error",
 }
 
+def swt_encode(uid, expire=86400):
+    expire += time.time_ns() // 1000000000
+    data = f"{uid}.{expire}"
+    digest = hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
+    return f"{data}.{digest}"
+
+def swt_decode(token):
+    data, _, digest = token.rpartition(".")
+    uid, _, expire = data.partition(".")
+    try:
+        uid = int(uid)
+        expire = int(expire)
+    except ValueError:
+        return None
+    return (uid if
+        expire > time.time_ns() // 1000000000 and
+        digest == hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
+        else None)
+
 class Request:
-    def __init__(self, method, path, query):
+    def __init__(self, method, path, params):
         self.method = method
         self.path = path
-        self.params = {}
-        for item in query.split("&"):
-            key, _, value = item.partition("=")
-            if key:
-                self.params[key] = value
+        self.params = params
 
     def auth(self):
         if "access_token" not in self.params:
@@ -48,33 +63,14 @@ class Response(Exception):
         self.status = status
         self.body = body
 
-def swt_encode(uid, expire=86400):
-    expire += time.time_ns() // 1000000000
-    data = f"{uid}.{expire}"
-    digest = hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
-    return f"{data}.{digest}"
-
-def swt_decode(token):
-    try:
-        data, _, digest = token.rpartition(".")
-        expected_digest = hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
-        assert digest == expected_digest
-        uid, _, expire = data.partition(".")
-        expire = int(expire)
-        assert expire > time.time_ns() // 1000000000
-        uid = int(uid)
-        return uid
-    except:
-        return None
+endpoints = {}
 
 def api(path):
-    if path not in api.endpoints:
-        api.endpoints[path] = {}
+    if path not in endpoints:
+        endpoints[path] = {}
     def decorator(fn):
-        api.endpoints[path][fn.__name__] = fn
+        endpoints[path][fn.__name__] = fn
     return decorator
-
-api.endpoints = {}
 
 #---------------------------------------
 
@@ -240,7 +236,28 @@ def POST(req):
 
     except Exception:
         return Response(200, {"saved": False})
+
 #---------------------------------------
+
+def api(method, path, query=None):
+    params = {}
+    if query:
+        for item in query.split("&"):
+            key, _, value = item.partition("=")
+            if key:
+                params[key] = value
+    if path.startswith("/api/"):
+        path = path[4:]
+    methods = endpoints.get(path)
+    if methods is None:
+        return Response(404)
+    handler = methods.get(method)
+    if handler is None:
+        return Response(405)
+    try:
+        return handler(Request(method, path, params))
+    except Response as response:
+        return response
 
 def main():
     direct = "REQUEST_METHOD" not in os.environ
@@ -256,21 +273,7 @@ def main():
         path = os.environ.get("PATH_INFO", "")
         query = os.environ.get("QUERY_STRING", "")
 
-    try:
-        if path.startswith("/api/"):
-            path = path[4:]
-        methods = api.endpoints.get(path)
-        if methods is None:
-            raise Response(404)
-        handler = methods.get(method)
-        if handler is None:
-            raise Response(405)
-        response = handler(Request(method, path, query))
-    except Response as e:
-        response = e
-    if response is None:
-        response = Response(HTTP.NOT_IMPLEMENTED)
-
+    response = api(method, path, query)
     prefix = "HTTP/1.1" if direct else "status:"
     phrase = http_status_map[response.status]
     body = response.body
