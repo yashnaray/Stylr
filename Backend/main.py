@@ -131,6 +131,115 @@ def GET(req):
     import match
     return Response(200, match.match())
 
+@api("/recommendations")
+def GET(req):
+    uid = req.auth()
+    try:
+        limit = int(req.params.get("limit", "30"))
+    except:
+        limit = 30
+    if limit < 1:
+        limit = 1
+    if limit > 50:
+        limit = 50
+    items = []
+    try:
+        from userSetup import User
+        user = User(uid)
+        recs = user.get_recs(num_recs=limit) or []
+        for x in recs[:limit]:
+            items.append({
+                "id": x.get("id") or x.get("index") or 0,
+                "productDisplayName": x.get("productDisplayName") or x.get("name") or "",
+                "masterCategory": x.get("masterCategory") or x.get("category") or "",
+                "subCategory": x.get("subCategory") or x.get("subcategory") or "",
+                "articleType": x.get("articleType") or x.get("article_type") or "",
+                "baseColour": x.get("baseColour") or x.get("base_colour") or "",
+                "season": x.get("season") or "",
+                "usage": x.get("usage") or "",
+                "imageURL": x.get("imageURL") or x.get("url") or "",
+                "price": x.get("price"),
+                "name": x.get("name") or x.get("productDisplayName") or ""
+            })
+    except Exception:
+        import match
+        for _ in range(limit):
+            x = match.match()
+            items.append({
+                "id": x.get("id") or 0,
+                "productDisplayName": x.get("name") or "",
+                "masterCategory": x.get("category") or "",
+                "subCategory": x.get("subcategory") or "",
+                "articleType": x.get("article_type") or "",
+                "baseColour": x.get("base_colour") or "",
+                "season": x.get("season") or "",
+                "usage": x.get("usage") or "",
+                "imageURL": x.get("url") or "",
+                "price": x.get("price"),
+                "name": x.get("name") or ""
+            })
+
+    return Response(200, {"items": items})
+
+
+@api("/interactions/log")
+def POST(req):
+    uid = req.auth()
+
+    data = req.json()
+    item = data.get("item") or {}
+    viewed = bool(data.get("viewed", True))
+    liked = bool(data.get("liked", False))
+
+#backup incase user data isn't restored
+    try:
+        from db import Session
+        from Analytics.model_interactions import Item, Interaction
+
+        s = Session()
+        try:
+            qid = item.get("id")
+            name = item.get("productDisplayName") or item.get("name") or ""
+            category = item.get("masterCategory") or item.get("category") or ""
+            subcategory = item.get("subCategory") or item.get("subcategory") or ""
+            article_type = item.get("articleType") or item.get("article_type") or ""
+            base_colour = item.get("baseColour") or item.get("base_colour") or ""
+            season = item.get("season") or ""
+            usage = item.get("usage") or ""
+            image_url = item.get("imageURL") or item.get("url") or ""
+            price = item.get("price")
+
+            db_item = None
+            if isinstance(qid, int):
+                db_item = s.query(Item).filter_by(id=qid).first()
+            if not db_item:
+                db_item = Item(
+                    id=qid if isinstance(qid, int) else None,
+                    name=name,
+                    category=category,
+                    subcategory=subcategory,
+                    article_type=article_type,
+                    base_colour=base_colour,
+                    season=season,
+                    usage=usage,
+                    image_url=image_url,
+                    price=price,
+                )
+                s.add(db_item)
+                s.flush()
+
+            inter = Interaction(user_id=uid, item_id=db_item.id, viewed=viewed, liked=liked)
+            s.add(inter)
+            s.commit()
+            return Response(200, {"interaction_id": inter.id, "item_id": db_item.id, "saved": True})
+        except:
+            s.rollback()
+            raise
+        finally:
+            s.close()
+
+    except Exception:
+        return Response(200, {"saved": False})
 #---------------------------------------
 
 def main():
