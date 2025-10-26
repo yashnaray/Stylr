@@ -30,5 +30,5 @@ def match(*, gender, categories, colors, contexts, limit=10):
         "color": enums.color_names[clr],
         "context": enums.context_names[ctx],
         "name": name,
-        "url": "https://assets.myntassets.com/v1/" + url
+        "url": "https://assets.myntassets.com/h_720,q_90,w_540/v1/" + url
     } for id, gen, cat1, cat2, cat3, clr, ctx, name, url in items]

@@ -1,25 +1,32 @@
-import { useContext } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Link, Routes, Route, useLocation, useNavigate } from "react-router";
-import { UserContext, UserProvider } from "./user.tsx";
-import App from "./App.tsx";
-import Login from "./Login.tsx";
-import Register from "./Register.tsx";
+import { BrowserRouter, Link, Navigate, Outlet, Routes, Route, useLocation } from "react-router";
+import { useUser, UserProvider } from "./user.tsx";
+import App from "./pages/App.tsx";
+import Login from "./pages/Login.tsx";
+import Register from "./pages/Register.tsx";
+import Swipe from "./pages/Swipe.tsx";
 import "./main.css";
-import SwipePage from "./pages/Swipe";
 
-function Root() {
+declare global {
+  const __api: string;
+}
+
+function Protected() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { token } = useContext(UserContext);
+  const { token } = useUser();
   if (!token) {
-    queueMicrotask(() => navigate("/login", {
-      replace: true,
-      state: { referer: location.pathname + location.search + location.hash }
-    }));
-    return null;
+    const referer = location.pathname + location.search + location.hash;
+    return <Navigate to="/login" replace state={{ referer }} />;
   }
-  return <App />;
+  return <Outlet />;
+}
+
+function Entry() {
+  const { token } = useUser();
+  if (token) {
+    return <Navigate to="/" replace />;
+  }
+  return <Outlet />;
 }
 
 function NotFound() {
@@ -35,15 +42,19 @@ function NotFound() {
 const root = document.getElementById("root")!;
 
 createRoot(root).render(
-  <UserProvider>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" Component={Root} />
-        <Route path="/login" Component={Login} />
-        <Route path="/register" Component={Register} />
-        <Route path="/swipe" Component={SwipePage} />
+  <BrowserRouter>
+    <Routes>
+      <Route Component={UserProvider}>
+        <Route Component={Protected}>
+          <Route path="/" Component={App} />
+          <Route path="/swipe" Component={Swipe} />
+        </Route>
+        <Route Component={Entry}>
+          <Route path="/login" Component={Login} />
+          <Route path="/register" Component={Register} />
+        </Route>
         <Route path="*" Component={NotFound} />
-      </Routes>
-    </BrowserRouter>
-  </UserProvider>
+      </Route>
+    </Routes>
+  </BrowserRouter>
 );

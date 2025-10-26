@@ -43,5 +43,8 @@ export default {
       polyfill: false
     }
   },
-  clearScreen: false
+  clearScreen: false,
+  define: {
+    __api: JSON.stringify(process.env.STYLR_API_URL || "/api")
+  }
 };

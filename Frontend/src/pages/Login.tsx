@@ -1,24 +1,21 @@
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { UserContext } from './user.tsx';
+import { useUser } from "../user";
 
 function InputField(props: React.JSX.IntrinsicElements['input']) {
   return <input className="block w-full border-1 border-gray-400 hover:border-black my-2 p-1" {...props} />
 }
 
 export default function Login() {
-  const { setToken } = useContext(UserContext);
+  const { setToken } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function doSubmit(data: unknown) {
-    const response = await fetch("/api/login", {
+    const response = await fetch(`${__api}/login`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json'
-      },
       body: JSON.stringify(data)
     });
     if (response.status === 401) {

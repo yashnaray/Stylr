@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-body {
+:root {
   display: flex;
   flex-direction: column;
   justify-content: center;

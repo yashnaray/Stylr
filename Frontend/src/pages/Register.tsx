@@ -1,13 +1,13 @@
-import { useContext, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { UserContext } from './user.tsx';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { useUser } from "../user";
 
 function InputField(props: React.JSX.IntrinsicElements['input']) {
   return <input className="block w-full border-1 border-gray-400 hover:border-gray-500 my-2 p-1" {...props} />
 }
 
 export default function Register() {
-  const { setToken } = useContext(UserContext);
+  const { setToken } = useUser();
   const navigate = useNavigate();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -26,11 +26,8 @@ export default function Register() {
     }
     setPending(true);
     try {
-      const response = await fetch("/api/register", {
+      const response = await fetch(`${__api}/register`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json'
-        },
         body: JSON.stringify({ username, password })
       });
       if (response.status === 401) {

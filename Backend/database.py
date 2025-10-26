@@ -29,11 +29,14 @@ def create_user(cur, username, passhash, salt, role=1):
     try:
         execute(cur,
             "INSERT INTO users (username, password, salt, role, fullname) "
-            "VALUES (?, ?, ?, ?, ?) RETURNING uid",
+            "VALUES (?, ?, ?, ?, ?)",
             (username, passhash, salt, role, username))
-        return cur.fetchone()[0]
     except IntegrityError:
         return None
+    execute(cur,
+        "SELECT uid FROM users WHERE username == ?",
+        (username,))
+    return cur.fetchone()[0]
 
 @transaction
 def lookup_user(cur, username):

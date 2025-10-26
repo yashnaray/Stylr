@@ -1,24 +1,28 @@
-import { createContext, useState, type PropsWithChildren } from 'react';
+import { createContext, useContext, useEffect, useState } from "react";
+import { Outlet } from "react-router";
 
-const TOKEN_STORAGE_KEY = 'stylr-access-token';
+const TOKEN_STORAGE_KEY = "stylr-access-token";
 
-export const UserContext = createContext<{
+const UserContext = createContext<{
   token: string | null,
   setToken: (token: string | null) => void
 }>(null!);
 
-export function UserProvider({ children }: PropsWithChildren) {
-  const [token, rawSetToken] = useState(sessionStorage.getItem(TOKEN_STORAGE_KEY));
-  function setToken(newToken: string | null) {
-    if (newToken !== null)
-      sessionStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+export const useUser = () => useContext(UserContext);
+
+export function UserProvider() {
+  const [token, setToken] = useState(sessionStorage.getItem(TOKEN_STORAGE_KEY));
+
+  useEffect(() => {
+    if (token !== null)
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
     else
       sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    rawSetToken(newToken);
-  }
+  }, [token]);
+
   return (
     <UserContext value={{ token, setToken }}>
-      {children}
+      <Outlet />
     </UserContext>
   );
 }

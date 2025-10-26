@@ -1,8 +1,7 @@
-import { useContext } from 'react';
-import { UserContext } from './user';
+import { useUser } from "../user";
 
 export default function App() {
-  const { setToken } = useContext(UserContext);
+  const { setToken } = useUser();
   return (
     <>
       <div className="text-center">
