@@ -1,48 +1,50 @@
-import hashlib
-import json
 import os
-import psycopg2
 
-DATABASE_URL = os.getenv("STYLR_DATABASE_URL", "dbname=postgres user=postgres port=3031")
+database_url = os.getenv("STYLR_DATABASE_URL", "sqlite:data/local.db")
+backend, _, dsn = database_url.partition(":")
 
-def hash_password(password, salt):
-    h = hashlib.sha512()
-    h.update(password.encode() + salt.encode())
-    return h.hexdigest()
+if backend == "sqlite":
+    from sqlite3 import IntegrityError, connect
+    def execute(cur, script, params=None):
+        cur.execute(script, params)
+elif backend == "psycopg2":
+    from psycopg2 import IntegrityError, connect
+    def execute(cur, script, params=None):
+        cur.execute(script.replace("?", "%s"), params)
 
-class Connection:
-    def __init__(self):
-        self.conn = psycopg2.connect(DATABASE_URL)
-        self.conn.autocommit = True
-
-    def close(self):
-        self.conn.close()
-
-    def create_user(self, username, password):
-        salt = os.urandom(16).hex()
-        passhash = hash_password(password, salt)
+def transaction(fn):
+    def wrapper(*args, **kwargs):
+        conn = connect(dsn)
+        cur = conn.cursor()
         try:
-            with self.conn:
-                cur = self.conn.cursor()
-                cur.execute(
-                    "INSERT INTO users (username, password, salt) "
-                    "VALUES (%s, %s, %s) RETURNING uid",
-                    (username, passhash, salt))
-        except psycopg2.IntegrityError:
-            return None
-        (uid,) = cur.fetchone()
-        return uid
+            res = fn(cur, *args, **kwargs)
+            conn.commit()
+        finally:
+            conn.close()
+        return res
+    return wrapper
 
-    def verify_user(self, username, password):
-        with self.conn:
-            cur = self.conn.cursor()
-            cur.execute(
-                "SELECT uid, password, salt FROM users WHERE username = %s",
-                (username,))
-        result = cur.fetchone()
-        if result is None:
-            return None
-        uid, passhash, salt = result
-        if hash_password(password, salt) != passhash:
-            return None
-        return uid
+@transaction
+def create_user(cur, username, passhash, salt, role=1):
+    try:
+        execute(cur,
+            "INSERT INTO users (username, password, salt, role, fullname) "
+            "VALUES (?, ?, ?, ?, ?) RETURNING uid",
+            (username, passhash, salt, role, username))
+        return cur.fetchone()[0]
+    except IntegrityError:
+        return None
+
+@transaction
+def lookup_user(cur, username):
+    execute(cur,
+        "SELECT uid, password, salt FROM users WHERE username = ?",
+        (username,))
+    return cur.fetchone()
+
+@transaction
+def get_settings(cur, uid):
+    execute(cur,
+        "SELECT gender, prefs FROM users WHERE uid = ?",
+        (uid,))
+    return cur.fetchone()

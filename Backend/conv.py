@@ -44,12 +44,18 @@ import optparse
 import os
 import shutil
 import sys
-import urllib.request
 import zipfile
 
 base_url = "https://www.kaggle.com/api/v1/datasets/download/paramaggarwal/fashion-product-images-dataset/fashion-dataset%2f"
-data_dir = "data"
 files = ["styles.csv", "images.csv"]
+
+gender_map = {
+    b"Unisex": 0,
+    b"Women": 1,
+    b"Men": 2,
+    b"Girls": None,
+    b"Boys": None,
+}
 
 def assert_removeprefix(s, prefix):
     assert s.startswith(prefix)
@@ -60,109 +66,111 @@ def assert_removesuffix(s, suffix):
     return s[:-len(suffix)]
 
 def scoreboard(d):
-    return {key: i + 1 for i, key in enumerate(
+    return {key: i for i, key in enumerate(
         sorted(d, key=lambda key: d[key], reverse=True)
     )}
 
-def dump_js_list(file, name, values):
-    file.write(b"export const " + name + b" = {\n")
+def dump_py_list(file, name, values):
+    file.write(name + b" = [\n")
     for value in values:
-        file.write(b"  \"" + value + b"\",\n")
-    file.write(b"];\n")
+        file.write(b"  '" + value + b"',\n")
+    file.write(b"]\n")
 
 def main():
     parser = optparse.OptionParser()
     parser.add_option("-f", "--force", action="store_true", help="download files even if they exist")
-    parser.add_option("-n", "--dry-run", action="store_true", help="don't write composite file")
+    parser.add_option("-n", "--dry-run", action="store_true", help="don't write output files")
     opts, args = parser.parse_args()
     if args:
         parser.error(f"unexpected argument {args[0]!r}")
 
+    os.chdir(os.path.dirname(__file__))
+
     try:
-        os.mkdir(data_dir)
+        os.mkdir("data")
     except FileExistsError:
         pass
 
-    os.chdir(data_dir)
+    os.chdir("data")
 
     for file in files:
         if not opts.force and os.path.exists(file):
             continue
+        from urllib.request import urlopen
         url = base_url + file
         print(f"Downloading {url}")
         buffer = io.BytesIO()
-        with urllib.request.urlopen(url) as response:
+        with urlopen(url) as response:
             shutil.copyfileobj(response, buffer)
         print(f"Extracting {file}")
-        zipfile.ZipFile(buffer).extract(file)
+        zipfile.ZipFile(buffer).extract("data")
 
-    items = {}
+    images = {}
+    items = []
     categories = defaultdict(int)
     colors = defaultdict(int)
-    usages = defaultdict(int)
+    contexts = defaultdict(int)
     num_no_image = 0
+    num_skipped = 0
     max_name = 0
     max_url = 0
     max_text = 0
-
-    gender_map = {
-        b"Women": 1,
-        b"Men": 2,
-        b"Girls": 3,
-        b"Boys": 4,
-        b"Unisex": 5
-    }
-
-    with open("styles.csv", "rb") as file:
-        file.readline()
-        for line in file:
-            id, gender, cat1, cat2, cat3, color, season, year, usage, name = line.split(b",", 9)
-            gender = gender_map[gender]
-            categories[cat1] += 1
-            categories[cat2] += 1
-            categories[cat3] += 1
-            if not color or color == b"NA":
-                color = None
-            else:
-                colors[color] += 1
-            if not usage or usage == b"NA":
-                usage = None
-            else:
-                usages[usage] += 1
-            name = name.strip().replace(b",", b";")
-            if len(name) > max_name:
-                max_name = len(name)
-            if id in items:
-                sys.stderr.write(f"duplicate item {id!r}")
-            else:
-                items[id] = [id, name, None, gender, cat1, cat2, cat3, color, usage]
+    gender_freq = [0, 0, 0]
 
     with open("images.csv", "rb") as file:
-        file.readline()
+        file.readline() # skip header
         for line in file:
             id, url = line.split(b",")
             id = assert_removesuffix(id, b".jpg")
             url = url.strip()
             if url == b"undefined":
-                del items[id]
-                num_no_image += 1
                 continue
             url = assert_removeprefix(url, b"http://assets.myntassets.com/")
             if url.startswith(b"v1/"):
                 url = url[3:]
+            images[id] = url
+
+    with open("styles.csv", "rb") as file:
+        file.readline() # skip header
+        for line in file:
+            id, gender, cat1, cat2, cat3, color, season, year, context, name = line.split(b",", 9)
+            if id not in images:
+                num_no_image += 1
+                continue
+            gender = gender_map[gender]
+            if gender is None:
+                num_skipped += 1
+                continue
+            gender_freq[gender] += 1
+            cats = {cat1, cat2, cat3}
+            for cat in cats:
+                categories[cat] += 1
+            if not color or color == b"NA":
+                color = b"Unknown"
+            colors[color] += 1
+            if not context or context == b"NA":
+                context = b"Unknown"
+            contexts[context] += 1
+            name = name.strip().replace(b",", b";")
+            url = images[id]
+            if len(name) > max_name:
+                max_name = len(name)
             if len(url) > max_url:
                 max_url = len(url)
-            item = items[id]
-            if len(item[1]) + len(url) > max_text:
-                max_text = len(item[1]) + len(url)
-            item[2] = url
+            if len(name) + len(url) > max_text:
+                max_text = len(name) + len(url)
+            items.append((id, gender, cats, color, context, name, url))
 
     sys.stdout.write(
-        f"{len(items)} items\n"
-        f"{num_no_image} missing images\n"
-        f"{len(categories)} categories\n"
-        f"{len(colors)} colors\n"
-        f"{len(usages)} usages\n"
+        f"items: {len(items)}\n"
+        f"  unisex: {gender_freq[0]}\n"
+        f"  female: {gender_freq[1]}\n"
+        f"  male: {gender_freq[2]}\n"
+        f"missing images: {num_no_image}\n"
+        f"skipped: {num_skipped}\n"
+        f"categories: {len(categories)}\n"
+        f"colors: {len(colors)}\n"
+        f"contexts: {len(contexts)}\n"
         f"max name: {max_name}\n"
         f"max url: {max_url}\n"
         f"max text: {max_text}\n"
@@ -173,25 +181,29 @@ def main():
 
     categories = scoreboard(categories)
     colors = scoreboard(colors)
-    usages = scoreboard(usages)
+    contexts = scoreboard(contexts)
 
-    with open("filters.js", "wb") as file:
-        dump_js_list(file, b"categories", categories)
-        dump_js_list(file, b"colors", colors)
-        dump_js_list(file, b"usages", usages)
+    with open("../enums.py", "wb") as file:
+        file.write(b"# Automatically generated by conv.py\n")
+        dump_py_list(file, b"gender_names", gender_map)
+        dump_py_list(file, b"category_names", categories)
+        dump_py_list(file, b"color_names", colors)
+        dump_py_list(file, b"context_names", contexts)
 
     with open("items", "wb") as file:
-        for id, name, url, gender, cat1, cat2, cat3, color, usage in items.values():
-            cats = [categories[cat] for cat in {cat1, cat2, cat3}]
+        for id, gender, cats, color, context, name, url in items:
+            cats = [categories[cat] for cat in cats]
+            cats.sort()
             while len(cats) < 3:
                 cats.append(0)
             file.write(bytes([
-                (gender << 4) | (usages[usage] if usage is not None else 0),
-                colors[color] if color is not None else 0,
+                gender,
                 *cats,
+                colors[color],
+                contexts[context],
                 len(name),
                 len(url)
-            ]) + name + url + b" " * (248 - len(name) - len(url)) + b"\n")
+            ]) + name + url)
 
 if __name__ == "__main__":
     main()

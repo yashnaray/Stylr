@@ -1,10 +1,10 @@
-import { execFile, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
 /** @type {import("vite").ServerHook} */
 function configureServer(server) {
-  execFileSync("python3", ["startdb.py"], {
+  execFile("python3", ["initdb.py"], {
     cwd: "../Backend",
     stdio: "inherit"
   });

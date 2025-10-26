@@ -1,8 +1,11 @@
 #!/bin/sh
 
 files='
-main.py
+data/items
 database.py
+enums.py
+main.py
+match.py
 '
 
 script='

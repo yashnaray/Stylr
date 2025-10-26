@@ -6,7 +6,9 @@ import os
 import sys
 import time
 
-SECRET_KEY = os.getenv("STYLR_SECRET_KEY", "gurleen_dhillon").encode()
+secret_key = "gurleen_dhillon"
+direct = True
+bypass_auth = None
 
 http_status_map = {
     200: "OK",
@@ -20,7 +22,7 @@ http_status_map = {
 def swt_encode(uid, expire=86400):
     expire += time.time_ns() // 1000000000
     data = f"{uid}.{expire}"
-    digest = hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
+    digest = hmac.new(secret_key.encode(), data.encode(), "sha256").hexdigest()
     return f"{data}.{digest}"
 
 def swt_decode(token):
@@ -33,8 +35,14 @@ def swt_decode(token):
         return None
     return (uid if
         expire > time.time_ns() // 1000000000 and
-        digest == hmac.new(SECRET_KEY, data.encode(), "sha256").hexdigest()
+        digest == hmac.new(secret_key.encode(), data.encode(), "sha256").hexdigest()
         else None)
+
+def hash_password(password, salt):
+    import hashlib
+    h = hashlib.sha512()
+    h.update(password.encode() + salt.encode())
+    return h.hexdigest()
 
 class Request:
     def __init__(self, method, path, params):
@@ -43,6 +51,8 @@ class Request:
         self.params = params
 
     def auth(self):
+        if bypass_auth:
+            return bypass_auth
         if "access_token" not in self.params:
             raise Response(401, "No access token supplied")
         token = self.params["access_token"]
@@ -59,9 +69,14 @@ class Request:
             raise Response(400, "Could not parse request body")
 
 class Response(Exception):
-    def __init__(self, status, body=None):
+    def __init__(self, status, body=None, *, compact=False):
         self.status = status
-        self.body = body
+        self.phrase = http_status_map[self.status]
+        self.body = (
+            {"message": self.phrase} if body is None else
+            {"message": body} if isinstance(body, str) else body
+        )
+        self.compact = compact
 
 endpoints = {}
 
@@ -94,13 +109,11 @@ def POST(req):
     except:
         return Response(400)
 
-    from database import Connection
-    conn = Connection()
-    uid = conn.verify_user(username, password)
-    conn.close()
-    if uid is None:
+    import database
+    res = database.lookup_user(username)
+    if res is None or hash_password(password, res[2]) != res[1]:
         return Response(401, "Invalid credentials. Please try again.")
-    token = swt_encode(uid)
+    token = swt_encode(res[0])
     return Response(200, {"access_token": token})
 
 @api("/register")
@@ -114,72 +127,60 @@ def POST(req):
     except:
         return Response(400)
 
-    from database import Connection
-    conn = Connection()
-    uid = conn.create_user(username, password)
+    import database
+    salt = os.urandom(16).hex()
+    passhash = hash_password(password, salt)
+    uid = database.create_user(username, passhash, salt)
     if uid is None:
         return Response(401, "This username is already taken.")
     token = swt_encode(uid)
     return Response(200, {"access_token": token})
 
-@api("/match")
+@api("/settings")
 def GET(req):
-    import match
-    return Response(200, match.match())
+    uid = req.auth()
+    import database
+    import enums
+    res = database.get_settings(uid)
+    if res is None:
+        return Response(401, "User not found")
+    gender, prefs = res
+    prefs = int(prefs, 16) << 1
+    return Response(200, {
+        "gender": enums.gender_names[gender],
+        "categories": [[name, (prefs := prefs >> 1) & 1] for name in enums.category_names],
+        "colors": [[name, (prefs := prefs >> 1) & 1] for name in enums.color_names],
+        "contexts": [[name, (prefs := prefs >> 1) & 1] for name in enums.context_names]
+    }, compact=True)
 
-@api("/recommendations")
+@api("/settings")
+def POST(req):
+    uid = req.auth()
+
+@api("/match")
 def GET(req):
     uid = req.auth()
     try:
-        limit = int(req.params.get("limit", "30"))
+        limit = int(req.params["limit"])
     except:
-        limit = 30
+        limit = 5
     if limit < 1:
         limit = 1
-    if limit > 50:
+    elif limit > 50:
         limit = 50
-    items = []
-    try:
-        from userSetup import User
-        user = User(uid)
-        recs = user.get_recs(num_recs=limit) or []
-        for x in recs[:limit]:
-            items.append({
-                "id": x.get("id") or x.get("index") or 0,
-                "productDisplayName": x.get("productDisplayName") or x.get("name") or "",
-                "masterCategory": x.get("masterCategory") or x.get("category") or "",
-                "subCategory": x.get("subCategory") or x.get("subcategory") or "",
-                "articleType": x.get("articleType") or x.get("article_type") or "",
-                "baseColour": x.get("baseColour") or x.get("base_colour") or "",
-                "season": x.get("season") or "",
-                "usage": x.get("usage") or "",
-                "imageURL": x.get("imageURL") or x.get("url") or "",
-                "price": x.get("price"),
-                "name": x.get("name") or x.get("productDisplayName") or ""
-            })
-    except Exception:
-        import match
-        for _ in range(limit):
-            x = match.match()
-            items.append({
-                "id": x.get("id") or 0,
-                "productDisplayName": x.get("name") or "",
-                "masterCategory": x.get("category") or "",
-                "subCategory": x.get("subcategory") or "",
-                "articleType": x.get("article_type") or "",
-                "baseColour": x.get("base_colour") or "",
-                "season": x.get("season") or "",
-                "usage": x.get("usage") or "",
-                "imageURL": x.get("url") or "",
-                "price": x.get("price"),
-                "name": x.get("name") or ""
-            })
 
-    return Response(200, {"items": items})
+    # TODO
+    import match
+    return Response(200, match.match(
+        gender=1,
+        categories=-1,
+        colors=-1,
+        contexts=-1,
+        limit=limit))
 
-
-@api("/interactions/log")
+@api("/interactions")
 def POST(req):
+    return Response(500)
     uid = req.auth()
 
     data = req.json()
@@ -260,33 +261,37 @@ def api(method, path, query=None):
         return response
 
 def main():
-    direct = "REQUEST_METHOD" not in os.environ
+    global bypass_auth
 
     if direct:
-        if len(sys.argv) != 3:
-            sys.stderr.write(f"usage: {sys.argv[0]} METHOD URL\n")
-            sys.exit(2)
-        method, url = sys.argv[1:]
+        import optparse
+        parser = optparse.OptionParser(usage="%prog METHOD URL [PARAMS...]")
+        parser.add_option("-u", "--uid", type="int", help="bypass authentication")
+        opts, args = parser.parse_args()
+        if len(args) < 2:
+            parser.error("not enough arguments")
+        bypass_auth = opts.uid
+        method, url = args[:2]
         path, _, query = url.partition("?")
+        for arg in args[2:]:
+            query = query + "&" + arg if query else arg
     else:
         method = os.environ["REQUEST_METHOD"]
         path = os.environ.get("PATH_INFO", "")
         query = os.environ.get("QUERY_STRING", "")
 
-    response = api(method, path, query)
     prefix = "HTTP/1.1" if direct else "status:"
-    phrase = http_status_map[response.status]
-    body = response.body
-    body = ({"message": phrase} if body is None else
-            {"message": body} if isinstance(body, str) else body)
+    res = api(method, path, query)
+    body = (json.dumps(res.body, separators=(",", ":")) if res.compact else
+            json.dumps(res.body, indent=2))
 
-    sys.stdout.write(
-        f"{prefix} {response.status} {phrase}\r\n"
-        "access-control-allow-origin: *\r\n"
-        "content-type: application/json\r\n"
-        "\r\n"
-        f"{json.dumps(body, indent=2)}\n"
-    )
+    sys.stdout.write(f"""\
+{prefix} {res.status} {res.phrase}\r
+access-control-allow-origin: *\r
+content-type: application/json\r
+\r
+{body}
+""")
 
 if __name__ == "__main__":
     main()

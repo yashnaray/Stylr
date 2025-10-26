@@ -1,52 +1,59 @@
-import sys, pathlib, os, types
-BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-os.environ.setdefault("STYLR_SECRET_KEY", "for_tests_only")
-os.environ.setdefault("DATABASE_URL", "sqlite:///tests/test.db")
-
+import io
+import json
 import pytest
-import main as app
+import os
+import sqlite3
+import sys
 
-@pytest.fixture(scope="session")
-def token() -> str:
-    return app.swt_encode(1001)
+os.environ["STYLR_DATABASE_URL"] = "sqlite:"
 
-@pytest.fixture(scope="session", autouse=True)
-def bootstrap_db():
+backend_dir = os.path.join(os.path.dirname(__file__), "..")
+if backend_dir not in sys.path:
+    sys.path.insert(1, backend_dir)
+
+import database
+import main
+
+main.secret_key = "for_tests_only"
+database.connect = None
+database.close = lambda conn: None
+
+def api(method, path, params=None, body=None):
+    query = None
+    if params is not None:
+        query = "&".join(f"{key}={value}" for key, value in params.items())
+    stdin = sys.stdin
+    if body is not None:
+        sys.stdin = io.StringIO(json.dumps(body))
     try:
-        from tests.util_db_bootstrap import init_db
-        init_db()
-    except Exception:
+        return main.api(method, path, query)
+    finally:
+        sys.stdin = stdin
+
+class MockConnection(sqlite3.Connection):
+    def close(self):
         pass
-    yield
 
-@pytest.fixture(scope="session", autouse=True)
-def stub_usersetup_module():
-    if "userSetup" not in sys.modules:
-        m = types.ModuleType("userSetup")
-        class User:
-            def __init__(self, uid):
-                self.uid = uid
-            def get_recs(self, num_recs=30):
-                return []
-        m.User = User
-        sys.modules["userSetup"] = m
-    yield
+@pytest.fixture
+def database(monkeypatch):
+    import database
+    import hashlib
+    conn = sqlite3.connect(":memory:", factory=MockConnection)
+    try:
+        cur = conn.cursor()
+        with open(os.path.join(backend_dir, "init.sql")) as file:
+            cur.executescript(file.read())
+        cur.close()
+        conn.commit()
+        monkeypatch.setattr(database, "connect", lambda url: conn)
+        yield database
+    finally:
+        sqlite3.Connection.close(conn)
 
-@pytest.fixture(autouse=True)
-def safe_match_fallback(mocker):
-    mocker.patch("match.match", return_value={
-        "id": 0,
-        "name": "Fallback",
-        "category": "",
-        "subcategory": "",
-        "article_type": "",
-        "base_colour": "",
-        "season": "",
-        "usage": "",
-        "url": "http://x/fallback.jpg",
-        "price": 0
-    })
-    yield
+@pytest.fixture
+def auth_admin(monkeypatch):
+    monkeypatch.setattr(main, "bypass_auth", 1)
+
+@pytest.fixture
+def auth_user(monkeypatch):
+    monkeypatch.setattr(main, "bypass_auth", 2)
