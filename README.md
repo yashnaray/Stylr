@@ -12,12 +12,11 @@ with a backend implemented in Python.
 
 ## Getting Started
 
-### Frontend
-
 You will need:
 
-- A recent enough [Node](https://nodejs.org) (at least 20 or 22)
-- [pnpm](https://pnpm.io)
+- A recent enough [Python](https://docs.python.org/3/) (at least 3.8)
+- A recent enough [Node](https://nodejs.org/api/) (at least 20 or 22)
+- [pnpm](https://pnpm.io) (recommended) or other package manager
 
 Change to the `Frontend` directory, then:
 
@@ -26,24 +25,12 @@ pnpm install
 pnpm dev
 ```
 
-This will open the Vite server at the standard <http://localhost:5173>.
-By default, the `/api` route will be proxied to <http://localhost:3031>.
-This can be changed by setting the environment variable `STYLR_API_URL`.
-
-### Backend
-
-You will need:
-
-- A recent enough [Python](https://www.python.org)
-
-Change to the `Backend` directory, then:
-
-```
-./main.py
-```
-
-This will bind to port 3031 by default.
-All routes are available at both the top level and `/api`.
+This will open the Vite server at the standard <http://localhost:5173>
+and mount the backend at `/api`. This will also automatically
+download the data for the backend and initialize a local testing database
+if you haven't done so already. The backend uses
+[SQLite](https://docs.python.org/3/library/sqlite3.html) by default,
+so no additional database packages are needed during development.
 
 ## Rationale
 
@@ -58,6 +45,19 @@ Other alternatives considered:
 - Yarn PnP uses an on-disk format that has limited compatability and requires
   all programs to be run through Yarn.
 - Bun is an entire JavaScript runtime, which we do not need.
+
+### CGI
+
+The backend is a
+[CGI](https://httpd.apache.org/docs/current/howto/cgi.html) application.
+While CGI is horribly inefficient and is universally considered to be
+a terrible way of doing things (see the documentation for the
+[removed Python `cgi` module](https://docs.python.org/3/library/cgi.html)),
+this does allow us to host the project for free on
+[cise.ufl.edu](https://cise.ufl.edu)
+and take advantage of the university database servers. It also makes
+development easier. In any case, if we were trying to make it efficient,
+we wouldn't be writing it in Python anyway.
 
 ## Copyright
 
