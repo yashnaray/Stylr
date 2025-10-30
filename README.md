@@ -53,7 +53,7 @@ The backend is a
 While CGI is horribly inefficient and is universally considered to be
 a terrible way of doing things (see the documentation for the
 [removed Python `cgi` module](https://docs.python.org/3/library/cgi.html)),
-this does allow us to host the project for free on
+this does allow us as part of our tuition to host the project on
 [cise.ufl.edu](https://cise.ufl.edu)
 and take advantage of the university database servers. It also makes
 development easier. In any case, if we were trying to make it efficient,
