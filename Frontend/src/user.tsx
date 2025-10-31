@@ -3,10 +3,12 @@ import { Outlet } from "react-router";
 
 const TOKEN_STORAGE_KEY = "stylr-access-token";
 
-const UserContext = createContext<{
-  token: string | null,
-  setToken: (token: string | null) => void
-}>(null!);
+interface UserContext {
+  token: string | null;
+  setToken(token: string | null): void;
+}
+
+const UserContext = createContext<UserContext>(null!);
 
 export const useUser = () => useContext(UserContext);
 

@@ -192,7 +192,7 @@ function Deck({ items }: DeckProps) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 h-screen overflow-hidden">
+    <div className="grow flex flex-col items-center justify-center gap-4 overflow-hidden">
       <div style={{ position: "relative", width: "min(92vw, 420px)", maxWidth: 420, aspectRatio: "3/4" }}>
         <div className="absolute inset-0 rounded-16 border-1 border-dashed border-gray-400 grid place-items-center text-gray-500">
           No more items

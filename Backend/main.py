@@ -172,7 +172,7 @@ def GET(req):
     # TODO
     import match
     return Response(200, match.match(
-        gender=1,
+        gender=2,
         categories=-1,
         colors=-1,
         contexts=-1,

@@ -46,7 +46,7 @@ export default function Register() {
   }
 
   return (
-    <div className="mx-auto max-w-96 text-center bg-white p-4">
+    <div className="w-full mx-auto max-w-96 text-center bg-white p-4">
       <h1 className="text-3xl font-bold my-4">Create an account</h1>
       <p>Or <Link to="/login" className="underline text-blue-500">return to login</Link>.</p>
       <form onSubmit={submit}>

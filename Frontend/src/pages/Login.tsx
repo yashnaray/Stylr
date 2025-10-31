@@ -51,7 +51,7 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto max-w-96 text-center bg-white p-4">
+    <div className="w-full mx-auto max-w-96 text-center bg-white p-4">
       <h1 className="text-3xl font-bold my-4">Stylr</h1>
       <p>No account? <Link to="/register" className="underline text-blue-500">Register</Link></p>
       <form onSubmit={submit}>
