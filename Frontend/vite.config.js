@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 
 /** @type {import("vite").ServerHook} */
 function configureServer(server) {
-  execFile("python3", ["initdb.py"], {
+  execFile("python3", ["init.py"], {
     cwd: "../Backend",
     stdio: "inherit"
   });

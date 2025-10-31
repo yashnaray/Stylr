@@ -25,29 +25,25 @@
 # FILES
 #
 #   This script downloads the data required by the application and
-#   performs some minimal data processing. All files are written into
-#   the `data` directory.
+#   performs some minimal data processing.
 #
 #   These files contain raw data:
 #
-#     - styles.csv: list of clothing articles and metadata
-#     - images.csv: mapping between filenames and image URLs
+#     - data/styles.csv: list of clothing articles and metadata
+#     - data/images.csv: mapping between filenames and image URLs
 #
-#   This script simply combines them into a single file:
+#   These files are generated as output:
 #
-#     - items.csv
+#     - data/items.csv: data in compact form
+#     - enums.py: mappings from criteria numbers to names
 #
 
-from collections import defaultdict
-import io
-import optparse
 import os
-import shutil
 import sys
-import zipfile
 
-base_url = "https://www.kaggle.com/api/v1/datasets/download/paramaggarwal/fashion-product-images-dataset/fashion-dataset%2f"
-files = ["styles.csv", "images.csv"]
+source_url = "https://www.kaggle.com/api/v1/datasets/download/paramaggarwal/fashion-product-images-dataset/fashion-dataset%2f"
+source_files = ["styles.csv", "images.csv"]
+database_file = "local.db"
 
 gender_map = {
     b"Unisex": 0,
@@ -67,7 +63,7 @@ def assert_removesuffix(s, suffix):
 
 def scoreboard(d):
     return {key: i for i, key in enumerate(
-        sorted(d, key=lambda key: d[key], reverse=True)
+        sorted(d, key=lambda key: (-d[key], key))
     )}
 
 def dump_py_list(file, name, values):
@@ -76,35 +72,28 @@ def dump_py_list(file, name, values):
         file.write(b"  '" + value + b"',\n")
     file.write(b"]\n")
 
-def main():
-    parser = optparse.OptionParser()
-    parser.add_option("-f", "--force", action="store_true", help="download files even if they exist")
-    parser.add_option("-n", "--dry-run", action="store_true", help="don't write output files")
-    opts, args = parser.parse_args()
-    if args:
-        parser.error(f"unexpected argument {args[0]!r}")
+def download_source_file(file):
+    from urllib.request import urlopen
+    import io
+    import shutil
+    import zipfile
+    url = source_url + file
+    print(f"Downloading {url}")
+    buffer = io.BytesIO()
+    with urlopen(url) as response:
+        shutil.copyfileobj(response, buffer)
+    print(f"Extracting {file}")
+    ZipFile(buffer).extract()
 
-    os.chdir(os.path.dirname(__file__))
+def init_data(*, download=False, force=False):
+    for file in source_files:
+        if download or not os.path.exists(file):
+            download_source_file(file)
 
-    try:
-        os.mkdir("data")
-    except FileExistsError:
-        pass
+    if not force and os.path.exists("items"):
+        return
 
-    os.chdir("data")
-
-    for file in files:
-        if not opts.force and os.path.exists(file):
-            continue
-        from urllib.request import urlopen
-        url = base_url + file
-        print(f"Downloading {url}")
-        buffer = io.BytesIO()
-        with urlopen(url) as response:
-            shutil.copyfileobj(response, buffer)
-        print(f"Extracting {file}")
-        zipfile.ZipFile(buffer).extract("data")
-
+    from collections import defaultdict
     images = {}
     items = []
     categories = defaultdict(int)
@@ -176,9 +165,6 @@ def main():
         f"max text: {max_text}\n"
     )
 
-    if opts.dry_run:
-        return
-
     categories = scoreboard(categories)
     colors = scoreboard(colors)
     contexts = scoreboard(contexts)
@@ -204,6 +190,50 @@ def main():
                 len(name),
                 len(url)
             ]) + name + url)
+
+def init_database(*, reset=False):
+    with open("../init.sql") as file:
+        init_sql = file.read()
+
+    if reset:
+        try:
+            os.remove(database_file)
+        except FileNotFoundError:
+            pass
+
+    # Create tables and other structures
+    import sqlite3
+    conn = sqlite3.connect(database_file)
+    try:
+        cur = conn.cursor()
+        cur.executescript(init_sql)
+        conn.commit()
+    finally:
+        conn.close()
+
+def main():
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-d", "--data", action="store_const", dest="target", const=1, help="initialize dataset only")
+    parser.add_option("-b", "--database", action="store_const", dest="target", const=2, help="initialize database only")
+    parser.add_option("-f", "--force", action="count", default=0, help="delete everything and start over (-ff to force download)")
+    opts, args = parser.parse_args()
+    if args:
+        parser.error(f"unexpected argument {args[0]!r}")
+
+    os.chdir(os.path.dirname(__file__))
+
+    try:
+        os.mkdir("data")
+    except FileExistsError:
+        pass
+
+    os.chdir("data")
+
+    if opts.target is None or opts.target == 1:
+        init_data(download=opts.force >= 2, force=opts.force >= 1)
+    if opts.target is None or opts.target == 2:
+        init_database(reset=opts.force >= 1)
 
 if __name__ == "__main__":
     main()
