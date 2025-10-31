@@ -25,7 +25,7 @@ def test_login(database):
     assert res.status == 200
     assert swt_decode(res.body["access_token"]) == 1
 
-def test_login_invalid(database):
+def test_login_bad_credentials(database):
     res1 = api("POST", "/login", body={
         "username": "not",
         "password": "narayan"
@@ -50,6 +50,41 @@ def test_register(database):
     res = api("GET", "/uid", {"access_token": token})
     assert res.status == 200
     assert res.body["uid"] == swt_decode(token)
+
+def test_register_username_invalid(database):
+    res = api("POST", "/register", body={
+        "username": "gavin_",
+        "password": "shroeder"
+    })
+    assert res.status == 400
+
+def test_register_username_min(database):
+    res = api("POST", "/register", body={
+        "username": "mac",
+        "password": "callous"
+    })
+    assert res.status == 200
+
+def test_register_username_too_short(database):
+    res = api("POST", "/register", body={
+        "username": "ma",
+        "password": "callous"
+    })
+    assert res.status == 400
+
+def test_register_username_max(database):
+    res = api("POST", "/register", body={
+        "username": "machinery01234567890123456789012",
+        "password": "callous"
+    })
+    assert res.status == 200
+
+def test_register_username_too_long(database):
+    res = api("POST", "/register", body={
+        "username": "machinery012345678901234567890123",
+        "password": "callous"
+    })
+    assert res.status == 400
 
 def test_register_conflict(database):
     res = api("POST", "/register", body={

@@ -3,6 +3,7 @@
 import hmac
 import json
 import os
+import re
 import sys
 import time
 
@@ -104,6 +105,7 @@ def POST(req):
     try:
         username = data["username"]
         assert isinstance(username, str)
+        assert re.match(r"^[0-9a-z]{3,32}$", username)
         password = data["password"]
         assert isinstance(password, str)
     except:
@@ -122,6 +124,7 @@ def POST(req):
     try:
         username = data["username"]
         assert isinstance(username, str)
+        assert re.match(r"^[0-9a-z]{3,32}$", username)
         password = data["password"]
         assert isinstance(password, str)
     except:
