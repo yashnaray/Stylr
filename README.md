@@ -53,10 +53,45 @@ The backend is a
 While CGI is horribly inefficient and is universally considered to be
 a terrible way of doing things (see the documentation for the
 [removed Python `cgi` module](https://docs.python.org/3/library/cgi.html)),
-this does allow us as part of our tuition to host the project on
+this does allow us to host the project on
 [cise.ufl.edu](https://cise.ufl.edu)
-and take advantage of the university database servers. It also makes
-development easier. In any case, if we were trying to make it efficient,
+and take advantage of the university database servers.
+This has several benefits:
+
+- This service is provided free to members of the University of Florida
+  computer science department.
+  This offer is hard to beat; free application hosting especially for Python is
+  difficult to find, and free database hosting is virtually nonexistent.
+- Having both our backend and database in the same network improves data
+  locality and reduces database access latencies.
+- As our application is expected to have few users (if any), we are more
+  concerned about idle overhead than peak traffic throughput.
+  With CGI, there is no persistent server process, so resource usage while idle
+  is no more than that of a basic web server.
+- In Python, it is very easy to cause the process to block.
+  (Contrast this with Node.js, in which one has to _opt-out_ of the thread pool
+  by using the `*Sync()` filesystem functions and network operations are
+  _always_ asynchronous.)
+  By forcing each request into a separate process, we ensure that they are
+  handled concurrently and do not interfere with each other.
+- Since it is difficult for processes to share state, the above point virtually
+  forces the backend to be stateless, eliminating a number of potential bugs.
+  (In contrast, sharing state between threads is all too easy to do and
+  notoriously hard to do correctly.)
+
+Also note the following points:
+
+- Modern applications are increasingly offloading part or most of their work to
+  "serverless functions," in which edge nodes can spin up server processes
+  automatically when clients interact with the application, and terminate these
+  processes to save resources when traffic is low.
+  When one of these function instances is first initialized, it is known as a
+  "cold start," and the performance for the request that triggered the
+  initialization is no better than CGI.
+  More information is available in the
+  [Vercel documentation](https://vercel.com/docs/fundamentals/what-is-compute).
+
+At any rate, if we were trying to make it efficient,
 we wouldn't be writing it in Python anyway.
 
 ## Copyright
