@@ -1,20 +1,20 @@
-def match(*, gender, categories, colors, contexts, limit=10):
+def match(*, gender, tags, limit=10):
     import random
     items = []
     id = 0
     with open("data/items", "rb") as file:
         while data := file.read(8):
             id += 1
-            gen, cat1, cat2, cat3, clr, ctx, nsz, usz = data
+            gen, ta1, ta2, ta3, ta4, ta5, nsz, usz = data
             name = file.read(nsz).decode()
             url = file.read(usz).decode()
-            if (gender == gen and
-                colors >> clr & 1 and
-                contexts >> ctx & 1 and
-                (categories >> cat1 & 1 or
-                 categories >> cat2 & 1 or
-                 categories >> cat3 & 1)):
-                items.append((id, gen, cat1, cat2, cat3, clr, ctx, name, url))
+            if ((not gender or gender == gen) and (
+                tags[ta1] or
+                tags[ta2] or
+                tags[ta3] or
+                tags[ta4] or
+                tags[ta5])):
+                items.append((id, gen, (ta1, ta2, ta3, ta4, ta5), name, url))
 
     if not items:
         return []
@@ -25,10 +25,8 @@ def match(*, gender, categories, colors, contexts, limit=10):
     import enums
     return [{
         "id": id,
-        "gender": enums.gender_names[gen],
-        "categories": [enums.category_names[cat] for cat in (cat1, cat2, cat3)],
-        "color": enums.color_names[clr],
-        "context": enums.context_names[ctx],
+        "gender": enums.gender_names[gender],
+        "tags": [enums.tag_names[tag] for tag in tags if tag],
         "name": name,
         "url": "https://assets.myntassets.com/h_720,q_90,w_540/v1/" + url
-    } for id, gen, cat1, cat2, cat3, clr, ctx, name, url in items]
+    } for id, gender, tags, name, url in items]

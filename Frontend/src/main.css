@@ -2,5 +2,6 @@
 
 :root {
   min-width: 320px;
+  overflow-y: scroll;
   @apply bg-gray-200;
 }

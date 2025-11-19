@@ -34,7 +34,7 @@ def create_user(cur, username, passhash, salt, role=1):
     except IntegrityError:
         return None
     execute(cur,
-        "SELECT uid FROM users WHERE username == ?",
+        "SELECT uid FROM users WHERE username = ?",
         (username,))
     return cur.fetchone()[0]
 
@@ -46,8 +46,26 @@ def lookup_user(cur, username):
     return cur.fetchone()
 
 @transaction
-def get_settings(cur, uid):
+def get_user(cur, uid):
     execute(cur,
-        "SELECT gender, prefs FROM users WHERE uid = ?",
+        "SELECT role, gender, prefs FROM users WHERE uid = ?",
         (uid,))
-    return cur.fetchone()
+    row = cur.fetchone()
+    if row is None:
+        return None
+    role, gender, prefs = row
+    tags = {}
+    for pref in prefs.split(";"):
+        key, _, value = pref.partition("=")
+        tags[key] = value
+    return {
+        "role": role,
+        "gender": gender,
+        "tags": tags
+    }
+
+@transaction
+def set_prefs(cur, uid, gender, prefs):
+    execute(cur,
+        "UPDATE users SET gender = ?, prefs = ? WHERE uid = ?",
+        (gender, prefs, uid))

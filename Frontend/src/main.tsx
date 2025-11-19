@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Outlet, Routes, Route, useLocation } from "react-router";
-import { useUser, UserProvider } from "./user.tsx";
+import { useRole, useUser, UserProvider } from "./user.tsx";
 import Login from "./pages/Login.tsx";
 import Register from "./pages/Register.tsx";
 import Settings from "./pages/Settings.tsx";
@@ -14,6 +14,7 @@ declare global {
 function Protected() {
   const location = useLocation();
   const { token, setToken } = useUser();
+  const role = useRole();
   if (!token) {
     const referer = location.pathname + location.search + location.hash;
     return <Navigate to="/login" replace state={{ referer }} />;
@@ -22,6 +23,7 @@ function Protected() {
     <div className="flex flex-col min-h-screen">
       <header className="flex items-center bg-white p-4 border-gray-300 border-b-1">
         <h1 className="text-lg font-bold grow"><Link to="/">Stylr</Link></h1>
+        {role === 0 && <div className="border-1 border-red-400 bg-red-200 text-sm text-red-600 px-2 mr-4 select-none">Admin</div>}
         <Link to="/settings" className="mr-4">Settings</Link>
         <button onClick={() => setToken(null)} className="cursor-pointer">Logout</button>
       </header>

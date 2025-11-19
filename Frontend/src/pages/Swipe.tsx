@@ -8,9 +8,7 @@ const FLY_OUT_MULT = 6;
 
 interface Item {
   id: number;
-  categories: string[];
-  color: string;
-  context: string;
+  tags: string[];
   name: string;
   url: string;
 }
@@ -79,7 +77,7 @@ function Card({ top = false, item, onSwipe }: CardProps) {
   return (
     <div
       className={
-        "absolute grid size-full touch-none select-none"
+        "absolute grid size-full touch-none select-none rounded-2xl"
         + (origin ? " shadow-2xl" : " shadow-lg transition duration-200 ease-out")
         + (top ? "" : " scale-90 opacity-80")
       }
@@ -90,25 +88,23 @@ function Card({ top = false, item, onSwipe }: CardProps) {
       style={{
         transform,
         //cursor: released ? "default" : "grab",
-        background: "#fff",
         gridTemplateRows: "1fr auto",
       }}
     >
       <img
-        className="size-full min-h-0 object-cover"
+        className="size-full min-h-0 object-cover bg-white rounded-t-2xl"
         src={item.url}
         draggable="false"
       />
 
-      <div style={{ padding: "10px 12px", borderTop: "1px solid #eee" }}>
-        <div style={{ fontWeight: 700 }}>{item.name}</div>
-        <div style={{ fontSize: 12, color: "#666" }}>
-          {[...item.categories, item.color, item.context].join(" \xb7 ")}
+      <div className="px-4 py-2 border-t-1 border-gray-300 bg-white rounded-b-2xl">
+        <strong>{item.name}</strong>
+        <div className="text-xs text-gray-600">
+          {item.tags.join(" \xb7 ")}
         </div>
       </div>
 
-      {/* swipe hints */}
-      {(
+      {/* swipe hints */ (
         <>
           <div style={hintLeftStyle(delta.x)}>PASS</div>
           <div style={hintRightStyle(delta.x)}>LIKE</div>
@@ -116,7 +112,7 @@ function Card({ top = false, item, onSwipe }: CardProps) {
       )}
 
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none rounded-2xl"
         style={{
           opacity: Math.abs(delta.x) / 1000,
           backgroundColor: delta.x > 0 ? "#00ff00" : "#ff0000"
@@ -194,7 +190,7 @@ function Deck({ items }: DeckProps) {
   return (
     <div className="grow flex flex-col items-center justify-center gap-4 overflow-hidden">
       <div style={{ position: "relative", width: "min(92vw, 420px)", maxWidth: 420, aspectRatio: "3/4" }}>
-        <div className="absolute inset-0 rounded-16 border-1 border-dashed border-gray-400 grid place-items-center text-gray-500">
+        <div className="absolute inset-0 rounded-2xl border-1 border-dashed border-gray-400 grid place-items-center text-gray-500">
           No more items
         </div>
         {next && <Card key={next.id} item={next} onSwipe={swipe} />}
@@ -223,7 +219,7 @@ export default function Swipe() {
       setLoading(true);
       setErr(null);
       try {
-        const response = await fetch(`${__api}/match?access_token=${token}&limit=5`);
+        const response = await fetch(`${__api}/match?access_token=${token}&limit=30`);
         if (response.status === 401) {
           return void setToken(null);
         }

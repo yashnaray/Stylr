@@ -139,26 +139,43 @@ def POST(req):
     token = swt_encode(uid)
     return Response(200, {"access_token": token})
 
-@api("/settings")
+@api("/user")
 def GET(req):
     uid = req.auth()
     import database
-    import enums
-    res = database.get_settings(uid)
-    if res is None:
-        return Response(401, "User not found")
-    gender, prefs = res
-    prefs = int(prefs, 16) << 1
-    return Response(200, {
-        "gender": enums.gender_names[gender],
-        "categories": [[name, (prefs := prefs >> 1) & 1] for name in enums.category_names],
-        "colors": [[name, (prefs := prefs >> 1) & 1] for name in enums.color_names],
-        "contexts": [[name, (prefs := prefs >> 1) & 1] for name in enums.context_names]
-    }, compact=True)
+    user = database.get_user(uid)
+    if user is None:
+        return Response(401, "No such user")
+    else:
+        return Response(200, user, compact=True)
 
-@api("/settings")
+@api("/user")
 def POST(req):
     uid = req.auth()
+    data = req.json()
+    entries = {}
+    try:
+        gender = data.get("gender")
+        if gender is not None:
+            assert gender == 0 or gender == 1 or gender == 2
+            entries["gender"] = gender
+        prefs = data.get("prefs")
+        if prefs is not None:
+            assert isinstance(prefs, dict)
+            for value in prefs.values():
+                assert isinstance(value, int)
+            entries["prefs"] = ""
+    except:
+        return Response(400)
+    if entries:
+        import database
+        database.set_user(uid, entries)
+    return Response(200)
+
+@api("/schema")
+def GET(req):
+    import enums
+    return Response(200, enums.preferences, compact=True)
 
 @api("/match")
 def GET(req):
@@ -174,12 +191,7 @@ def GET(req):
 
     # TODO
     import match
-    return Response(200, match.match(
-        gender=2,
-        categories=-1,
-        colors=-1,
-        contexts=-1,
-        limit=limit))
+    return Response(200, match.match(gender=0, tags=[1] * 256, limit=limit))
 
 @api("/interactions")
 def POST(req):
