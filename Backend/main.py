@@ -157,19 +157,19 @@ def POST(req):
     try:
         gender = data.get("gender")
         if gender is not None:
-            assert gender == 0 or gender == 1 or gender == 2
+            assert gender in (0, 1, 2)
             entries["gender"] = gender
-        prefs = data.get("prefs")
-        if prefs is not None:
-            assert isinstance(prefs, dict)
-            for value in prefs.values():
-                assert isinstance(value, int)
-            entries["prefs"] = ""
+        tags = data.get("tags")
+        if tags is not None:
+            assert type(tags) is dict
+            for value in tags.values():
+                assert value in (0, 1)
+            entries["tags"] = ";".join(f"{key}={value}" for key, value in tags.items())
     except:
         return Response(400)
     if entries:
         import database
-        database.set_user(uid, entries)
+        database.set_user(uid, **entries)
     return Response(200)
 
 @api("/schema")
@@ -179,7 +179,6 @@ def GET(req):
 
 @api("/match")
 def GET(req):
-    uid = req.auth()
     try:
         limit = int(req.params["limit"])
     except:

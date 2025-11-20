@@ -48,16 +48,17 @@ def lookup_user(cur, username):
 @transaction
 def get_user(cur, uid):
     execute(cur,
-        "SELECT role, gender, prefs FROM users WHERE uid = ?",
+        "SELECT role, gender, tags FROM users WHERE uid = ?",
         (uid,))
     row = cur.fetchone()
     if row is None:
         return None
-    role, gender, prefs = row
+    role, gender, rawtags = row
     tags = {}
-    for pref in prefs.split(";"):
-        key, _, value = pref.partition("=")
-        tags[key] = value
+    if rawtags:
+        for tag in rawtags.split(";"):
+            key, _, value = tag.partition("=")
+            tags[key] = int(value)
     return {
         "role": role,
         "gender": gender,
@@ -65,7 +66,8 @@ def get_user(cur, uid):
     }
 
 @transaction
-def set_prefs(cur, uid, gender, prefs):
+def set_user(cur, uid, **entries):
+    params = ",".join(f"{key} = ?" for key in entries)
     execute(cur,
-        "UPDATE users SET gender = ?, prefs = ? WHERE uid = ?",
-        (gender, prefs, uid))
+        f"UPDATE users SET {params} WHERE uid = ?",
+        (*entries.values(), uid))

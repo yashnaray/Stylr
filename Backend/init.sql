@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   role INTEGER NOT NULL,
   fullname TEXT NOT NULL,
   gender INTEGER NOT NULL DEFAULT 0,
-  prefs TEXT NOT NULL DEFAULT '0'
+  tags TEXT
 );
 
 -- uid: 1
