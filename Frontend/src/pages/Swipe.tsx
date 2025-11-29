@@ -178,13 +178,61 @@ interface DeckProps {
 }
 
 function Deck({ items }: DeckProps) {
+  const { token } = useUser();
   const [index, setIndex] = useState(0);
+  const [history, setHistory] = useState<Array<{ item: Item; liked: boolean }>>([]);
 
   const top = items[index];
   const next = items[index + 1];
+  const canUndo = history.length > 0;
 
-  function swipe(_like: boolean) {
+  async function swipe(like: boolean) {
+    const item = top;
     setIndex(index + 1);
+    setHistory([...history, { item, liked: like }]);
+    
+    if (token && item) {
+      try {
+        await fetch(`${__api}/interactions?access_token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item: {
+              id: item.id,
+              name: item.name,
+              url: item.url,
+              tags: item.tags
+            },
+            viewed: true,
+            liked: like
+          })
+        });
+      } catch (e) {
+      }
+    }
+  }
+
+  async function undo() {
+    if (history.length === 0) return;
+    
+    const lastAction = history[history.length - 1];
+    const newHistory = history.slice(0, -1);
+    
+    setHistory(newHistory);
+    setIndex(index - 1);
+    
+    if (token && lastAction.item) {
+      try {
+        await fetch(`${__api}/interactions?access_token=${token}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_id: lastAction.item.id
+          })
+        });
+      } catch (e) {
+      }
+    }
   }
 
   return (
@@ -197,9 +245,22 @@ function Deck({ items }: DeckProps) {
         {top && <Card top key={top.id} item={top} onSwipe={swipe} />}
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 items-center">
         <CircleButton alt="Pass" content="&times;" onClick={() => swipe(false)}
           className="text-3xl text-red-400 border-red-400 hover:bg-red-400" />
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          className={
+            "px-4 py-2 rounded-lg font-medium transition-colors duration-200 " +
+            (canUndo 
+              ? "bg-gray-200 text-gray-700 hover:bg-gray-300" 
+              : "bg-gray-100 text-gray-400 cursor-not-allowed")
+          }
+          aria-label="Undo"
+        >
+          ↶ Undo
+        </button>
         <CircleButton alt="Like" content="&hearts;" onClick={() => swipe(true)}
           className="text-2xl text-green-500 border-green-500 hover:bg-green-500" />
       </div>
@@ -241,16 +302,7 @@ export default function Swipe() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
-
-  //  const handleLike = async (item: Item) => {
-  //    if (!token) return;
-  //    try { await logInteraction(token, item, true, true); } catch {}
-  //  };
-  //  const handlePass = async (item: Item) => {
-  //    if (!token) return;
-  //    try { await logInteraction(token, item, true, false); } catch {}
-  //  };
+  }, [token, setToken]);
 
   if (loading) {
     return <p className="text-center">Loading...</p>;

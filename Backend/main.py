@@ -193,8 +193,58 @@ def GET(req):
     return Response(200, match.match(gender=0, tags=[1] * 256, limit=limit))
 
 @api("/interactions")
+def GET(req):
+    uid = req.auth()
+    try:
+        from Analytics.db import SessionLocal
+        from Analytics.models import ItemInfo, Interaction
+        from database import get_user
+        user = get_user(uid)
+        if not user:
+            return Response(200, [])
+        username = str(uid)
+        s = SessionLocal()
+        try:
+            interactions = s.query(Interaction, ItemInfo).join(
+                ItemInfo, Interaction.item_id == ItemInfo.item_id
+            ).filter(
+                Interaction.username == username,
+                Interaction.liked == True
+            ).order_by(
+                Interaction.ts.desc()
+            ).all()
+            items = []
+            for interaction, item in interactions:
+                tags = []
+                if item.tags:
+                    try:
+                        import json
+                        tags = json.loads(item.tags)
+                    except:
+                        pass
+                items.append({
+                    "id": item.item_id,
+                    "name": item.name,
+                    "category": item.category,
+                    "subcategory": item.subcategory,
+                    "article_type": item.article_type,
+                    "base_colour": item.base_colour,
+                    "season": item.season,
+                    "usage": item.usage,
+                    "url": item.image_url,
+                    "price": item.price,
+                    "liked_at": interaction.ts.isoformat() if interaction.ts else None,
+                    "tags": tags
+                }) 
+            return Response(200, items)
+        finally:
+            s.close()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(200, [])
+@api("/interactions")
 def POST(req):
-    return Response(500)
     uid = req.auth()
 
     data = req.json()
@@ -202,30 +252,78 @@ def POST(req):
     viewed = bool(data.get("viewed", True))
     liked = bool(data.get("liked", False))
 
-#backup incase user data isn't restored
     try:
-        from db import Session
-        from Analytics.model_interactions import Item, Interaction
+        from Analytics.db import SessionLocal
+        from Analytics.models import UserInfo, ItemInfo, Interaction
+        from database import get_user
+        user = get_user(uid)
+        if not user:
+            return Response(400, "User not found")
+        username = str(uid)
 
-        s = Session()
+        s = SessionLocal()
         try:
-            qid = item.get("id")
+            db_user = s.query(UserInfo).filter_by(username=username).first()
+            if not db_user:
+                db_user = UserInfo(username=username, gender=None)
+                s.add(db_user)
+                s.flush()
+            qid = item.get("id") 
+            original_url = item.get("url", "")
+            original_name = item.get("name", "")
+            original_tags = item.get("tags", [])
+            if not item.get("articleType"):
+                try:
+                    import csv
+                    with open("data/styles.csv", "r", encoding="utf-8") as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get("productDisplayName", "").strip() == original_name.strip():
+                                qid = int(row.get("id", qid))
+                                item = {**row, "url": original_url, "id": qid, "tags": original_tags}
+                                break
+                except Exception as e:
+                    print(f"Could not load item details from CSV: {e}")
+            
+            s.query(Interaction).filter_by(username=username, item_id=qid).delete()
+            
             name = item.get("productDisplayName") or item.get("name") or ""
             category = item.get("masterCategory") or item.get("category") or ""
             subcategory = item.get("subCategory") or item.get("subcategory") or ""
-            article_type = item.get("articleType") or item.get("article_type") or ""
-            base_colour = item.get("baseColour") or item.get("base_colour") or ""
+            article_type_csv = item.get("articleType") or item.get("article_type") or ""
+            base_colour_csv = item.get("baseColour") or item.get("base_colour") or ""
             season = item.get("season") or ""
             usage = item.get("usage") or ""
-            image_url = item.get("imageURL") or item.get("url") or ""
+            image_url = item.get("url") or item.get("imageURL") or ""
             price = item.get("price")
+            tags = item.get("tags", [])
+            article_type = category if category else article_type_csv
+            base_colour = ""
+            if name:
+                name_lower = name.lower()
+                color_keywords = ['Navy Blue', 'Off White', 'Coffee Brown', 'Grey Melange', 
+                                'Lime Green', 'Sea Green', 'Turquoise Blue', 'Mushroom Brown', 
+                                'Fluorescent Green', 'Blue', 'Silver', 'Black', 'Grey', 'Green', 
+                                'Purple', 'Beige', 'Brown', 'White', 'Bronze', 'Teal', 'Copper', 
+                                'Pink', 'Maroon', 'Red', 'Khaki', 'Orange', 'Yellow', 'Gold', 
+                                'Tan', 'Magenta', 'Lavender', 'Cream', 'Peach', 'Olive', 'Burgundy', 
+                                'Rust', 'Rose', 'Mauve', 'Metallic', 'Mustard', 'Taupe', 'Nude', 
+                                'Charcoal', 'Steel', 'Skin']
+                for color in color_keywords:
+                    if color.lower() in name_lower:
+                        base_colour = color
+                        break
+            if not base_colour:
+                base_colour = base_colour_csv
+            import json
+            tags_json = json.dumps(tags) if tags else None
 
             db_item = None
             if isinstance(qid, int):
-                db_item = s.query(Item).filter_by(id=qid).first()
+                db_item = s.query(ItemInfo).filter_by(item_id=qid).first()
             if not db_item:
-                db_item = Item(
-                    id=qid if isinstance(qid, int) else None,
+                db_item = ItemInfo(
+                    item_id=qid if isinstance(qid, int) else None,
                     name=name,
                     category=category,
                     subcategory=subcategory,
@@ -235,22 +333,63 @@ def POST(req):
                     usage=usage,
                     image_url=image_url,
                     price=price,
+                    tags=tags_json,
                 )
                 s.add(db_item)
                 s.flush()
 
-            inter = Interaction(user_id=uid, item_id=db_item.id, viewed=viewed, liked=liked)
+            inter = Interaction(username=username, item_id=db_item.item_id, viewed=viewed, liked=liked)
             s.add(inter)
             s.commit()
-            return Response(200, {"interaction_id": inter.id, "item_id": db_item.id, "saved": True})
-        except:
+            return Response(200, {"interaction_id": inter.id, "item_id": db_item.item_id, "saved": True})
+        except Exception as e:
             s.rollback()
+            import traceback
+            traceback.print_exc()
             raise
         finally:
             s.close()
-
-    except Exception:
-        return Response(200, {"saved": False})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(200, {"saved": False, "error": str(e)})
+@api("/interactions")
+def DELETE(req):
+    uid = req.auth()
+    data = req.json()
+    item_id = data.get("item_id")
+    if not item_id:
+        return Response(400, {"error": "item_id required"})
+    try:
+        from Analytics.db import SessionLocal
+        from Analytics.models import Interaction
+        from database import get_user
+        user = get_user(uid)
+        if not user:
+            return Response(400, "User not found")
+        username = str(uid)
+        s = SessionLocal()
+        try:
+            deleted_count = s.query(Interaction).filter_by(
+                username=username,
+                item_id=item_id
+            ).delete()
+            s.commit()
+            if deleted_count > 0:
+                return Response(200, {"deleted": True, "count": deleted_count})
+            else:
+                return Response(404, {"error": "Interaction not found"})
+        except Exception as e:
+            s.rollback()
+            import traceback
+            traceback.print_exc()
+            raise
+        finally:
+            s.close()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(500, {"error": str(e)})
 
 #---------------------------------------
 

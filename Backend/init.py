@@ -92,7 +92,7 @@ def download_source_file(file):
     with urlopen(url) as response:
         shutil.copyfileobj(response, buffer)
     print(f"Extracting {file}")
-    ZipFile(buffer).extract()
+    zipfile.ZipFile(buffer).extractall()
 
 def init_data(*, download=False, force=False):
     for file in source_files:
