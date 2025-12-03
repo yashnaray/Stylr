@@ -3,7 +3,6 @@
 import hmac
 import json
 import os
-import re
 import sys
 import time
 
@@ -102,14 +101,15 @@ def GET(req):
 @api("/login")
 def POST(req):
     data = req.json()
-    try:
-        username = data["username"]
-        assert isinstance(username, str)
-        assert re.match(r"^[0-9a-z]{3,32}$", username)
-        password = data["password"]
-        assert isinstance(password, str)
-    except:
-        return Response(400)
+    from validation import validate_username, validate_password
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not validate_username(username):
+        return Response(400, "Invalid username format. Use 3-32 lowercase letters or numbers.")
+    if not password or not validate_password(password):
+        return Response(400, "Password is required.")
 
     import database
     res = database.lookup_user(username)
@@ -121,21 +121,22 @@ def POST(req):
 @api("/register")
 def POST(req):
     data = req.json()
-    try:
-        username = data["username"]
-        assert isinstance(username, str)
-        assert re.match(r"^[0-9a-z]{3,32}$", username)
-        password = data["password"]
-        assert isinstance(password, str)
-    except:
-        return Response(400)
+    from validation import validate_username, validate_password
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not validate_username(username):
+        return Response(400, "Invalid username format. Use 3-32 lowercase letters or numbers.")
+    if not password or not validate_password(password):
+        return Response(400, "Password is required.")
 
     import database
     salt = os.urandom(16).hex()
     passhash = hash_password(password, salt)
     uid = database.create_user(username, passhash, salt)
     if uid is None:
-        return Response(401, "This username is already taken.")
+        return Response(400, "This username is already taken.")
     token = swt_encode(uid)
     return Response(200, {"access_token": token})
 
@@ -153,20 +154,21 @@ def GET(req):
 def POST(req):
     uid = req.auth()
     data = req.json()
+    from validation import validate_gender, validate_tags
     entries = {}
-    try:
-        gender = data.get("gender")
-        if gender is not None:
-            assert gender in (0, 1, 2)
-            entries["gender"] = gender
-        tags = data.get("tags")
-        if tags is not None:
-            assert type(tags) is dict
-            for value in tags.values():
-                assert value in (0, 1)
-            entries["tags"] = ";".join(f"{key}={value}" for key, value in tags.items())
-    except:
-        return Response(400)
+
+    gender = data.get("gender")
+    if gender is not None:
+        if not validate_gender(gender):
+            return Response(400, "Invalid gender value. Must be 0, 1, or 2.")
+        entries["gender"] = gender
+
+    tags = data.get("tags")
+    if tags is not None:
+        if not validate_tags(tags):
+            return Response(400, "Invalid tags format. Values must be 0 or 1.")
+        entries["tags"] = ";".join(f"{key}={value}" for key, value in tags.items())
+
     if entries:
         import database
         database.set_user(uid, **entries)
@@ -179,16 +181,9 @@ def GET(req):
 
 @api("/match")
 def GET(req):
-    try:
-        limit = int(req.params["limit"])
-    except:
-        limit = 5
-    if limit < 1:
-        limit = 1
-    elif limit > 50:
-        limit = 50
+    from validation import validate_limit
+    limit = validate_limit(req.params.get("limit"), default=5, min_val=1, max_val=50)
 
-    # TODO
     import match
     return Response(200, match.match(gender=0, tags=[1] * 256, limit=limit))
 
@@ -298,21 +293,9 @@ def POST(req):
             price = item.get("price")
             tags = item.get("tags", [])
             article_type = category if category else article_type_csv
-            base_colour = ""
-            if name:
-                name_lower = name.lower()
-                color_keywords = ['Navy Blue', 'Off White', 'Coffee Brown', 'Grey Melange', 
-                                'Lime Green', 'Sea Green', 'Turquoise Blue', 'Mushroom Brown', 
-                                'Fluorescent Green', 'Blue', 'Silver', 'Black', 'Grey', 'Green', 
-                                'Purple', 'Beige', 'Brown', 'White', 'Bronze', 'Teal', 'Copper', 
-                                'Pink', 'Maroon', 'Red', 'Khaki', 'Orange', 'Yellow', 'Gold', 
-                                'Tan', 'Magenta', 'Lavender', 'Cream', 'Peach', 'Olive', 'Burgundy', 
-                                'Rust', 'Rose', 'Mauve', 'Metallic', 'Mustard', 'Taupe', 'Nude', 
-                                'Charcoal', 'Steel', 'Skin']
-                for color in color_keywords:
-                    if color.lower() in name_lower:
-                        base_colour = color
-                        break
+
+            from colors import extract_color_from_name
+            base_colour = extract_color_from_name(name) if name else ""
             if not base_colour:
                 base_colour = base_colour_csv
             import json
